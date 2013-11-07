@@ -11,14 +11,12 @@ import (
 	html5 "code.google.com/p/go.net/html"
 )
 
-// [b]...[/b]
 // [color=#ff0000]...[/color]
 // [size=20%]...[/size]
 // [:)]
 // [list][*]...[*]...[/list]
 //   [ul][li]{text}[/li][/ul]
 // [table][tr][td]...[/td][/tr][/table]
-// [img width={width} height={height}]{url}[/img]
 
 // [XXX]
 // [XXX=YYY]
@@ -146,6 +144,12 @@ func tokensToHTML(tok *Tokenizer) ([]string, []error) {
 			bits = append(bits, html.EscapeString(t.Text))
 		} else {
 			switch t.Tag {
+			case "center":
+				if t.End {
+					bits = append(bits, "</span>")
+				} else {
+					bits = append(bits, `<span style="text-align:center;">`)
+				}
 			case "b":
 				if t.End {
 					bits = append(bits, "</strong>")
@@ -166,12 +170,26 @@ func tokensToHTML(tok *Tokenizer) ([]string, []error) {
 						errors = append(errors, ErrIncompleteTag("url"))
 					}
 				} else {
+					noLabel := false
+					if t.Value == "" {
+						t = tok.Next()
+						if t == nil || t.Tag != "" {
+							errors = append(errors, ErrIncompleteTag("url"))
+							break
+						}
+						t.Value = t.Text
+						noLabel = true
+					}
 					ur, err := validateUrl(t.Value)
 					if err != nil {
 						errors = append(errors, err)
 					} else {
 						inLink = true
-						bits = append(bits, "<a href=\"", ur.String(), "\">")
+						escapedUrl := html.EscapeString(ur.String())
+						bits = append(bits, "<a href=\"", escapedUrl, "\">")
+						if noLabel {
+							bits = append(bits, escapedUrl)
+						}
 					}
 				}
 			case "img":
@@ -194,7 +212,7 @@ func tokensToHTML(tok *Tokenizer) ([]string, []error) {
 						if err != nil {
 							errors = append(errors, err)
 						} else {
-							bits = append(bits, "<img src=\"", ur.String(), "\">")
+							bits = append(bits, "<img src=\"", html.EscapeString(ur.String()), "\">")
 						}
 					}
 				}

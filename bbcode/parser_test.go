@@ -1,40 +1,45 @@
 package bbcode
 
 import (
-	// "fmt"
-	"bytes"
 	"testing"
-
-	"code.google.com/p/go.net/html"
 )
 
-// func TestParser(t *testing.T) {
-// 	tok := TokenizeString("prefix [b]bold[/b] suffix [URL=http://www.google.com]blah[/url][i][/i]abc", -1)
-// 	for t := tok.Next(); t != nil; t = tok.Next() {
-// 		fmt.Printf("%+v\n", t)
-// 	}
-// }
+func testSimple(t *testing.T, bbcode, expectedHtml string) {
+	html, errs := BBCodeToHTML(bbcode)
+	if errs != nil {
+		t.Fatalf("BBCodeToHTML failed on '%s' with errors: %+v", bbcode, errs)
+	}
+	if html != expectedHtml {
+		t.Fatalf("BBCodeToHTML returned wrong html:\n%s\ninstead of the expected\n%s", html, expectedHtml)
+	}
+}
 
-func TestInvalidHTML(t *testing.T) {
-	r := bytes.NewReader([]byte("<html><body><b><i>testing</b></i></body></html>"))
-	h, err := html.Parse(r)
-	if err != nil {
-		t.Fatal(err)
+func testError(t *testing.T, bbcode string) {
+	_, errs := BBCodeToHTML(bbcode)
+	if errs == nil {
+		t.Fatalf("BBCodeToHTML expected error for '%s'", bbcode)
 	}
-	w := &bytes.Buffer{}
-	if err := html.Render(w, h); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("%s\n", w.String())
 }
 
 func TestToHTML(t *testing.T) {
-	html, errs := BBCodeToHTML("prefix [i][b]bold talic[/i] just bold[/b] suffix & [url=http://www.google.com][img]http://example.com/some.jpg[/img] & xx[/url] abc")
-	if errs != nil {
-		t.Fatalf("BBCodeToHTML failed with errors: %+v", errs)
-	}
-	expected := `prefix <em><strong>bold talic</strong></em><strong> just bold</strong> suffix &amp; <a href="http://www.google.com"><img src="http://example.com/some.jpg"/> &amp; xx</a> abc`
-	if html != expected {
-		t.Fatalf("BBCodeToHTML returned wrong html:\n%s\ninstead of\n%s", html, expected)
-	}
+	testSimple(t, "prefix [i][b]bold talic[/i] just bold[/b] suffix & [url=http://www.google.com][img]http://example.com/some.jpg[/img] & xx[/url] abc", `prefix <em><strong>bold talic</strong></em><strong> just bold</strong> suffix &amp; <a href="http://www.google.com"><img src="http://example.com/some.jpg"/> &amp; xx</a> abc`)
+}
+
+func TestB(t *testing.T) {
+	testSimple(t, "[b]italic[/b]", "<strong>italic</strong>")
+}
+
+func TestI(t *testing.T) {
+	testSimple(t, "[i]italic[/i]", "<em>italic</em>")
+}
+
+func TestUrl(t *testing.T) {
+	testSimple(t, "[url=http://www.google.com]google[/url]", `<a href="http://www.google.com">google</a>`)
+	testSimple(t, "[url]http://www.google.com/<foo>[/url]", `<a href="http://www.google.com/%3Cfoo%3E">http://www.google.com/%3Cfoo%3E</a>`)
+	testError(t, "[url=www.google.com]google[/url]")
+}
+
+func TestImg(t *testing.T) {
+	testSimple(t, "[img]http://www.google.com/logo.pcx[/img]", `<img src="http://www.google.com/logo.pcx"/>`)
+	testSimple(t, "[IMG]http://www.google.com/logo.pcx[/IMG]", `<img src="http://www.google.com/logo.pcx"/>`)
 }
