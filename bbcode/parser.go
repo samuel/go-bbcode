@@ -1,15 +1,19 @@
 package bbcode
 
 import (
+	"bytes"
 	"fmt"
 	"html"
 	"net/url"
 	"regexp"
 	"strings"
+
+	html5 "code.google.com/p/go.net/html"
 )
 
 // [b]...[/b]
 // [color=#ff0000]...[/color]
+// [size=20%]...[/size]
 // [:)]
 // [list][*]...[*]...[/list]
 //   [ul][li]{text}[/li][/ul]
@@ -28,19 +32,19 @@ var (
 type ErrUnknownTag string
 
 func (e ErrUnknownTag) Error() string {
-	return fmt.Sprintf("{ErrUnknownTag %s}", string(e))
+	return fmt.Sprintf("bbcode: unknown tag '%s'", string(e))
 }
 
 type ErrInvalidUrl string
 
 func (e ErrInvalidUrl) Error() string {
-	return fmt.Sprintf("{ErrInvalidUrl %s}", string(e))
+	return fmt.Sprintf("bbcode: invalid url '%s'", string(e))
 }
 
 type ErrIncompleteTag string
 
 func (e ErrIncompleteTag) Error() string {
-	return fmt.Sprintf("{ErrIncompleteTag %s}", string(e))
+	return fmt.Sprintf("bbcode: incomplete tag '%s'", string(e))
 }
 
 type Token struct {
@@ -200,8 +204,26 @@ func tokensToHTML(tok *Tokenizer) ([]string, []error) {
 	return bits, errors
 }
 
+func sanitizeHtml(ht string) (string, error) {
+	node, err := html5.Parse(strings.NewReader(ht))
+	if err != nil {
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	if err := html5.Render(buf, node); err != nil {
+		return "", err
+	}
+	str := buf.String()
+	return str[25 : len(str)-14], nil
+}
+
 func BBCodeToHTML(bbcode string) (string, []error) {
 	tok := TokenizeString(bbcode, 200)
 	bits, errs := tokensToHTML(tok)
-	return strings.Join(bits, ""), errs
+	html := strings.Join(bits, "")
+	htmlS, err := sanitizeHtml(html)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return htmlS, errs
 }
